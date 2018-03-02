@@ -1,5 +1,8 @@
 import { assert } from "chai";
 
+import * as QC from "ts-quickcheck";
+import { QuickCheck, Gen } from "ts-quickcheck";
+
 import { installCheck } from "./check";
 import * as Loriginal from "../src";
 
@@ -335,6 +338,70 @@ describe("List", () => {
     });
   });
   describe("concat", () => {
+    it("has left identity", () => {
+      assert.isTrue(
+        QC.QuickCheckStdout(Gen.range(2).array(), (m, p) => {
+          const xs = list(...m);
+          return equals(concat(list(), xs), xs);
+        })
+      );
+    });
+    it("has right identity", () => {
+      assert.isTrue(
+        QC.QuickCheckStdout(Gen.range(2).array(), (m, p) => {
+          const xs = list(...m);
+          return equals(concat(xs, list()), xs);
+        })
+      );
+    });
+    it("is associative", () => {
+      assert.isTrue(
+        QC.QuickCheckStdout(
+          Gen.range(2)
+            .array()
+            .replicate(3),
+          (xyz, p) => {
+            p.log(xyz);
+            const [xs, ys, zs] = xyz.map(s => list(...s));
+            const lhs = concat(xs, concat(ys, zs));
+            const rhs = concat(concat(xs, ys), zs);
+            p.log(toArray(lhs).join(""));
+            p.log(toArray(rhs).join(""));
+            return equals(lhs, rhs);
+          }
+        )
+      );
+    });
+    it("preserves lengths", () => {
+      assert.isTrue(
+        QC.QuickCheckStdout(
+          Gen.range(2)
+            .array()
+            .replicate(2)
+            .resize(x => x * 10),
+          (xy, p) => {
+            p.log(xy);
+            const [xs, ys] = xy.map(s => list(...s));
+            return xs.length + ys.length === concat(xs, ys).length;
+          }
+        )
+      );
+    });
+    it("preserves lengths", () => {
+      assert.isTrue(
+        QC.QuickCheckStdout(
+          Gen.range(2)
+            .array()
+            .replicate(2)
+            .resize(x => x * 10),
+          (xy, p) => {
+            p.log(xy);
+            const [xs, ys] = xy.map(s => list(...s));
+            return xs.length + ys.length === concat(xs, ys).length;
+          }
+        )
+      );
+    });
     it("concats empty sides", () => {
       const l = appendList(0, 4);
       assert.strictEqual(concat(l, empty()), l);
@@ -1166,6 +1233,28 @@ describe("List", () => {
       assertIndicesFromTo(l2, 6, 10);
     });
   });
+  describe("splitAt and concat", () => {
+    it("are inverses", () => {
+      assert.isTrue(
+        QC.QuickCheckStdout(
+          Gen.range(2)
+            .array()
+            .then(xs =>
+              Gen.record({ xs: Gen.pure(xs), i: Gen.range(xs.length + 1) })
+            ),
+          ({ xs, i }, p) => {
+            const li = list(...xs);
+            const [left, right] = splitAt(i, li);
+            p.log(toArray(li).join(""));
+            p.log(toArray(concat(left, right)).join(""));
+            p.log(toArray(left).join(""));
+            p.log(toArray(right).join(""));
+            return equals(concat(left, right), li);
+          }
+        )
+      );
+    });
+  });
   describe("splitAt", () => {
     it("splits at index", () => {
       const l = list(0, 1, 2, 3, 4, 5, 6, 7, 8);
@@ -1233,6 +1322,31 @@ describe("List", () => {
       const l = fromArray(array);
       assert.strictEqual(l.length, array.length);
       assertIndicesFromTo(l, 0, 9);
+    });
+  });
+  describe("fromArray and toArray", () => {
+    it("are inverses", () => {
+      assert.isTrue(
+        QC.QuickCheckStdout(
+          Gen.range(2)
+            .array()
+            .resize(x => x * 10),
+          (xs, p) => {
+            const li = fromArray(xs);
+            return equals(li, fromArray(toArray(li)));
+          }
+        )
+      );
+    });
+    it("are inverses", () => {
+      assert.isTrue(
+        QC.QuickCheckStdout(
+          Gen.range(2)
+            .array()
+            .resize(x => x * 10),
+          (xs, p) => p.deepEquals(xs, toArray(fromArray(xs)))
+        )
+      );
     });
   });
   describe("fromIterable", () => {
